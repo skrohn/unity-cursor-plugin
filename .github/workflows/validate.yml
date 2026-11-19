@@ -1,0 +1,27 @@
+name: Validate Plugin
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install validator dependencies
+        run: npm install --prefix /tmp/validator --no-save --no-audit --no-fund js-yaml@4
+
+      - name: Validate plugin and skills
+        env:
+          NODE_PATH: /tmp/validator/node_modules
+        run: node scripts/validate.mjs

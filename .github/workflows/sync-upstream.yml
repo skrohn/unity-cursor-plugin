@@ -1,0 +1,112 @@
+name: Sync Upstream
+
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Upstream git ref to sync
+        required: false
+        default: main
+        type: string
+      mode:
+        description: Delivery mode for upstream changes
+        required: false
+        default: direct
+        type: choice
+        options:
+          - direct
+          - pr
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: sync-upstream
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Sync from upstream
+        run: node scripts/sync-upstream.mjs --ref "${{ inputs.ref || 'main' }}"
+
+      - name: Install validator dependencies
+        run: npm install --prefix /tmp/validator --no-save --no-audit --no-fund js-yaml@4
+
+      - name: Validate synced plugin
+        env:
+          NODE_PATH: /tmp/validator/node_modules
+        run: node scripts/validate.mjs
+
+      - name: Check for changes
+        id: changes
+        run: |
+          if [ -z "$(git status --porcelain)" ]; then
+            echo "Already up to date with upstream"
+            echo "dirty=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "dirty=true" >> "$GITHUB_OUTPUT"
+          node -e '
+            const fs = require("node:fs");
+            const data = JSON.parse(fs.readFileSync("scripts/upstream.json", "utf8"));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `version=${data.version}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `commit=${data.commit}\n`);
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `short_sha=${data.commit.slice(0, 7)}\n`);
+          '
+
+      - name: Configure git author
+        if: steps.changes.outputs.dirty == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Commit and open PR
+        if: steps.changes.outputs.dirty == 'true' && inputs.mode == 'pr'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          BRANCH="chore/sync-upstream"
+          VERSION="${{ steps.changes.outputs.version }}"
+          COMMIT="${{ steps.changes.outputs.commit }}"
+          SHORT_SHA="${{ steps.changes.outputs.short_sha }}"
+          git checkout -B "$BRANCH"
+          git add -A
+          git commit -m "chore: sync upstream unity-agent-plugin (${VERSION}@${SHORT_SHA})"
+          git push --force-with-lease origin "$BRANCH"
+          PR_NUMBER="$(gh pr list --head "$BRANCH" --state open --json number --jq '.[0].number // empty')"
+          TITLE="chore: sync upstream unity-agent-plugin (${VERSION}@${SHORT_SHA})"
+          BODY="Automated sync from \`Unity-Technologies/unity-agent-plugin\` at \`${COMMIT}\` (\`v${VERSION}\`)."
+          if [ -n "$PR_NUMBER" ]; then
+            gh pr edit "$PR_NUMBER" --title "$TITLE" --body "$BODY"
+          else
+            gh pr create --base main --head "$BRANCH" --title "$TITLE" --body "$BODY"
+          fi
+
+      - name: Commit, push, and tag main
+        if: steps.changes.outputs.dirty == 'true' && inputs.mode != 'pr'
+        run: |
+          VERSION="${{ steps.changes.outputs.version }}"
+          SHORT_SHA="${{ steps.changes.outputs.short_sha }}"
+          TAG="v${VERSION}"
+          git add -A
+          git commit -m "chore: sync upstream unity-agent-plugin (${VERSION}@${SHORT_SHA})"
+          git push origin main
+          if ! git ls-remote --tags origin "refs/tags/${TAG}" | grep -q .; then
+            git tag "$TAG"
+            git push origin "$TAG"
+          fi

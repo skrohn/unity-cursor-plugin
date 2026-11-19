@@ -50,3 +50,17 @@ If you previously installed the standalone `unity-cli` skill in `~/.cursor/skill
 ```bash
 unity skill disable unity-cli --client cursor
 ```
+
+## Upstream Sync & Validation
+
+This repository stays in sync with [`Unity-Technologies/unity-agent-plugin`](https://github.com/Unity-Technologies/unity-agent-plugin) via `.github/workflows/sync-upstream.yml` (runs daily and on manual `workflow_dispatch`, supporting both `direct` commits to `main` and `pr` mode), with PR/push validation in `.github/workflows/validate.yml`.
+
+To run sync or validation locally:
+
+```bash
+node scripts/sync-upstream.mjs --dry-run
+node scripts/sync-upstream.mjs
+
+npm install --prefix /tmp/validator --no-save --no-audit --no-fund js-yaml@4
+NODE_PATH=/tmp/validator/node_modules node scripts/validate.mjs
+```
