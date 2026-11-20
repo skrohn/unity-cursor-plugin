@@ -4,7 +4,7 @@ Unity plugin for Cursor (`v0.1.10-beta`), hosted at [`skrohn/unity-cursor-plugin
 
 ## What This Plugin Provides
 
-The plugin installs the `using-unity` index skill (`skills/using-unity/SKILL.md`), which routes requests to 35 specialized Unity skills under `skills/using-unity/references/` without cluttering the top-level skill list. Included skills cover:
+The plugin installs the `using-unity` index skill (`skills/using-unity/SKILL.md`), which routes requests to 33 specialized Unity skills under `skills/using-unity/references/` without cluttering the top-level skill list. Included skills cover:
 
 - **Live Unity Editor & CLI control**: `unity-cli` and `unity-pipeline` for controlling running Unity Editors and projects through the `unity` CLI (recompiling scripts, running EditMode/PlayMode tests, inspecting console logs, running C# expressions, and managing Editors, packages, and builds) without requiring Unity MCP.
 - **UI & rendering**: `ui`, `ui-uitk`, `ui-ugui`, `ui-imgui`, `urp-postprocessing`, `migrate-birp-to-urp`, `shader-graph-create-custom-node`, `validate-urp-render-graph-renderer-feature`.
